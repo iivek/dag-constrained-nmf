@@ -11,22 +11,15 @@ These assumptions will be modeled as two Markov chains, the first one enforcing 
 Collaborative filtering methods collect preferences from other users and their recommendation is based on community-driven tastes of similar users. In case rating/preference data is scarce or the community that provides ratings is rather small, collaborative filtering methods will run into issues. What may help is introducing additional problem-specific knowledge in the model.
 This model includes extra information in form of item taxonomies and hope is that it will lead to better-informed recommendations in cases where number of ratings per item is small.
 
-# Example
-
-Decomposition results on a small synthetic dataset are shown below.
-![Reconstruction](/examples/example-reconstruction.jpg)
-![Latent factors](/examples/example-factors.jpg)
-The generated (oracle) matrix is low-rank, with known correlations in the latent factors. The algorithm has been presented with only 5% of the oracle data with the goal of reconstructing the rest. In case correlations are embedded into the algorithm, reconstruction is closer to the oracle, as compared to the correlation-ignorant decomposition
-
-## About the Model
+## About the model
 
 The presented probabilistic model is conjugate and its parameters are iteratively calculated using variational Bayesian learning; noise is Poissonian and matrix elements are Gamma distributed. Markov chains are built over Gamma variables belonging to the right factor matrix; in case a variable has multiple parents, a discrete mixture model with Dirichlet priors is introduced there (basically a child can be correlated to a single parent only and this selection is probabilistically modeled).
 The core of the generative model, Poisson-Gamma NMF model, as well as its inference is the same as in [1]; novelty are the additional hierarchical constraints over right matrix.
 
 ## Interpretation
 
-Let ***X*** (*n* x *m*) be matrix of ratings, where each row contains ratings related to a user (n users, m movies). Most commonly ***X*** has many unobserved values, as the only observed data are the user ratings. The algorithm finds low-rank factorizations of ***X***, ***X***=***T***&ast;***V***, where ***T*** (*n* x *i*) is activation matrix and ***V*** (*i* x *m*) matrix of latent factors, organised rowwise. Rating prediction then boils down to filling out the missing values of ***X***, which is done by multiplication of the two factor matrices.
-Note that DAG constraints are imposed on each of the rows of ***V***.
+Let X *(n x m)* be matrix of ratings, where each row contains ratings related to a user (n users, m movies). Most commonly X has many unobserved values, as the only observed data are the user ratings. The algorithm finds low-rank factorizations of X, X=T*V, where T (n x i) is activation matrix and V (i x m) matrix of latent factors, organised rowwise. Rating prediction then boils down to filling out the missing values of X, which is done by multiplication of the two factor matrices.
+Note that DAG constraints are imposed on each of the rows of V.
 
 ## References
 
