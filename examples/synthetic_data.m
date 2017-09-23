@@ -2,10 +2,10 @@
 %
 
 % Width and height of the input matrix, which is to be decomposed 
-W = 100;
-K = 70;
+W = 75;
+K = 100;
 % 'I' is the number of factors
-I = 10;
+I = 5;
 fanin = 3; %max fan-in for the adhacency matrix
 
 %% Adjacency matrix creation
@@ -23,11 +23,13 @@ adjacency = adjacency(order, order);
 %
 % matrix V -> the right one
 numparents = sum(adjacency);
-noparents = numparents==0;
-nr_params_to_initialize = sum(noparents);
-noparents = find(noparents);
-a_ve = ones(I,K)*100;
-mean_ve = 0 + (100-0).*rand(I,K);
+noparents_bool = numparents==0;
+nr_params_to_initialize = sum(noparents_bool);
+noparents = find(noparents_bool);
+
+a_ve = ones(I,K)*10;
+%mean_ve = ((10-0).*rand(I,K))./a_ve;
+mean_ve = gamrnd(ones(I,K)*0.5, ones(I,K));
 b_ve = mean_ve./a_ve;
 % mean is a_ve*b_ve
 %
@@ -50,6 +52,7 @@ V(:,noparents) = gamrnd(a_ve(:,noparents), b_ve(:,noparents));
 % sample from the first listed node to last with this condition satisfied
 relevant_indices = find( numparents>=1 );
 for(current = relevant_indices)
+    a_ve(:,current) = 200;
     % a safe way to get the current's parents:
     parents = find( adjacency(:,current) );
     active_parent = parents(1);
@@ -62,9 +65,25 @@ T = gamrnd(a_tm, b_tm);
 X = poissrnd(T*V);
 
 Xtrue = X;
-Ttrue = T;
-Vtrue = V;
-
 % Missing values are denoted by nans. Let's make some of the elements of X
 % unobserved.
-X(rand(size(X))>0.05) = NaN; % remove 95% of entries
+X(rand(size(X))>0.1) = NaN; % remove 90% of entries
+% Removing items which have no rating *and* no parents
+toremove = all(isnan(X)) & noparents_bool;
+X(:,toremove) = [];
+Xtrue(:,toremove) = [];
+V(:,toremove) = []';
+adjacency(toremove,:) = [];
+adjacency(:,toremove) = [];
+numparents = sum(adjacency);
+noparents_bool = numparents==0;
+nr_params_to_initialize = sum(noparents_bool);
+noparents = find(noparents_bool);
+% I should probably do the same with users which have no ratings, but'it's
+% a small probability we'll have that
+
+
+Ttrue = T;
+Vtrue = V;
+figure(2); imagesc(V./repmat(max(V,[],2),1,size(V,2)))
+figure(3); imagesc(Xtrue)
