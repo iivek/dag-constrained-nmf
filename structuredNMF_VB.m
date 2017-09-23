@@ -1,4 +1,4 @@
-function [E_t E_v a_tm b_tm a_ve b_ve M] = structuredNMF_VB(x, a_tm, b_tm, a_ve, b_ve, u_dirichlet, adjacency, ...
+function [E_t E_v a_tm b_tm a_ve b_ve M] = structuredNMF_VB(x, a_tm, b_tm, a_ve, b_ve, a_utility, u_dirichlet, adjacency, ...
     EPOCH, start_optimizing_hyperparameters_after, tie_v, tie_a_tm, tie_b_tm, print_period)
 
 % Dimensions of matrices
@@ -65,7 +65,7 @@ clear b_ve_sparse;
 %
 % Initial expectations which the inference alrgorithm starts with
 %
-parameter_mappings_V = ones(1,size(gamma_chain_adjacency,1));
+parameter_mappings_V = DAG_separatedness(gamma_chain_adjacency);
 nr_separated = size(parameter_mappings_V, 1);
 col_temp = b_ve(:,where_we_have_b(1));
 b_ve_temp = col_temp(:,ones(1,network_size));
@@ -88,6 +88,9 @@ for(current = 2:nr_separated)
 end
 clear indeces a_ve_temp col_temp;
 
+% shape parameters of the utility nodes are hardcoded
+a_ve(:,first_s:end) = a_utility;
+
 % Transposing a_ve i b_ve (it's a convention - it's simply how stuff gets stored for more efficient calculation)
 a_ve = a_ve';
 b_ve = b_ve';
@@ -96,7 +99,7 @@ t_init = gamrnd(a_tm, b_tm./a_tm);
 v_init = gamrnd(a_ve, b_ve_temp./a_ve);
 expectations_markov = zeros(network_size, I, 2);
 expectations_markov(:,:,1) = v_init;
-clear b_ve_temp where_we_have_b;
+clear b_ve_temp where_we_have_b b_ve_temp;
 expectations_markov(:,:,2) = expectations_markov(:,:,1);
 L_t = t_init;
 L_v = expectations_markov(1:last_v,:,1)';
@@ -210,7 +213,6 @@ for e=start_from:EPOCH,
         % They are different from other exponential family distributions in
         % the way log-partition function  gets determined; here we require
         % natural parameters to form discrete likelihoods
-        Z= sum(exp(natural_parameters));
         expectations_discrete{current} = exp(natural_parameters)./repmat(Z,size(natural_parameters,1),1);
     end
     

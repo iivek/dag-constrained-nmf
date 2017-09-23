@@ -9,12 +9,12 @@ synthetic_data;
 % initial parameters for the algorithm
 % Width and height of the input matrix, which is to be decomposed 
 [W,K] = size(X);
-I = 10; % number of factors
+I = 5; % number of factors
 
 % not interested in separate DAGs - fixing a single a_ve for each row
 %a_ve = ones (I,1)*100;
-a_ve = ones (I,nr_params_to_initialize)*100;
-b_ve = a_ve./1000;
+a_ve = ones(I,nr_params_to_initialize)*2;
+b_ve = 10./a_ve;
 %b_ve = b_ve(:,noparents);
 a_tm = ones(W,I);
 b_tm = ones(W,I); % rightfactor will be mean of exponential distros
@@ -31,17 +31,17 @@ end
 u_dirichlet = u_dirichlet_init;
 clear u_dirichlet_init;
 
-[T_est V_est a_tm_est b_tm_est a_ve_est b_ve_est M] = structuredNMF_VB(X, a_tm, b_tm.*a_tm, a_ve, b_ve.*a_ve, u_dirichlet, adjacency, ...
-    1000, ... % EPOCH
+[T_est V_est a_tm_est b_tm_est a_ve_est b_ve_est M] = structuredNMF_VB(X, a_tm, b_tm.*a_tm, a_ve, b_ve.*a_ve, 100, u_dirichlet, adjacency, ...
+    500, ... % EPOCH
     10, ... % optimize hyperparameters after
     'semifree', ... % let scale be optimized, shsape is as-is 
     'clamp', ... % clamp shape, insist on sparsity by leaving scale = 1
     'tie_all', ... % optimize scale, which is unique for all elements of T
-    20 ...    % print period    
+    500 ...    % print period    
 );
 
 X_est = T_est*V_est;
-% Xtrue-X_est
+Xtrue-X_est
 
 
 %% Okay... Now without the adjacency matrix
@@ -54,12 +54,12 @@ noparents = find(noparents);
 % initial parameters for the algorithm
 % Width and height of the input matrix, which is to be decomposed 
 [W,K] = size(X);
-I = 10; % number of factors
+I = 5; % number of factors
 
 % not interested in separate DAGs - fixing a single a_ve for each row
 %a_ve = ones (I,1)*100;
-a_ve = ones (I,nr_params_to_initialize)*100;
-b_ve = a_ve./1000;
+a_ve = ones(I,nr_params_to_initialize)*2;
+b_ve = 10./a_ve;
 %b_ve = b_ve(:,noparents);
 a_tm = ones(W,I);
 b_tm = ones(W,I); % rightfactor will be mean of exponential distros
@@ -76,13 +76,13 @@ end
 u_dirichlet = u_dirichlet_init;
 clear u_dirichlet_init;
 
-[T_est_no V_est_no a_tm_est b_tm_est a_ve_est b_ve_est M] = structuredNMF_VB(X, a_tm, b_tm.*a_tm, a_ve, b_ve.*a_ve, u_dirichlet, adjacency, ...
-    1000, ... % EPOCH
+[T_est_no V_est_no a_tm_est b_tm_est a_ve_est b_ve_est M] = structuredNMF_VB(X, a_tm, b_tm.*a_tm, a_ve, b_ve.*a_ve, 1000, u_dirichlet, adjacency, ...
+    500, ... % EPOCH
     10, ... % optimize hyperparameters after
     'semifree', ... % let scale be optimized, shsape is as-is 
     'clamp', ... % clamp shape, insist on sparsity by leaving scale = 1
     'tie_all', ... % optimize scale, which is unique for all elements of T
-    20 ...    % print period    
+    500 ...    % print period    
 );
 
 X_est_no = T_est_no*V_est_no;
