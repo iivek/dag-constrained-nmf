@@ -213,7 +213,14 @@ for e=start_from:EPOCH,
         % They are different from other exponential family distributions in
         % the way log-partition function  gets determined; here we require
         % natural parameters to form discrete likelihoods
-        expectations_discrete{current} = exp(natural_parameters)./repmat(Z,size(natural_parameters,1),1);
+        Z = sum(exp(natural_parameters));
+        % log-sum-exp trick
+        temp = max(natural_parameters);
+        logZ = temp+log(sum(exp(natural_parameters-repmat( temp, [size(natural_parameters,1), 1] ) )));
+        expectations_discrete{current} = exp(natural_parameters - repmat(logZ,size(natural_parameters,1),1));
+        % log-sum-exp trick done
+        % this is how the term would look like without the log-sum-exp trick:
+        % expectations_discrete{current} = exp(natural_parameters)./repmat(Z,size(natural_parameters,1),1);
     end
     
     L_t = exp(psi(alpha_tm)).*beta_tm;
