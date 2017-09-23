@@ -2,11 +2,11 @@
 %
 
 % Width and height of the input matrix, which is to be decomposed 
-W = 50;
+W = 75;
 K = 100;
 % 'I' is the number of factors
 I = 5;
-fanin = 2; %max fan-in for the adhacency matrix
+fanin = 3; %max fan-in for the adhacency matrix
 
 %% Adjacency matrix creation
 %
@@ -23,14 +23,13 @@ adjacency = adjacency(order, order);
 %
 % matrix V -> the right one
 numparents = sum(adjacency);
-noparents = numparents==0;
-nr_params_to_initialize = sum(noparents);
-noparents = find(noparents);
+noparents_bool = numparents==0;
+nr_params_to_initialize = sum(noparents_bool);
+noparents = find(noparents_bool);
 
 a_ve = ones(I,K)*10;
 %mean_ve = ((10-0).*rand(I,K))./a_ve;
-mean_ve = gamrnd(ones(I,K)*0.8, ones(I,K));
-mean_ve(mean_ve>10) = 10;
+mean_ve = gamrnd(ones(I,K)*0.5, ones(I,K));
 b_ve = mean_ve./a_ve;
 % mean is a_ve*b_ve
 %
@@ -66,9 +65,25 @@ T = gamrnd(a_tm, b_tm);
 X = poissrnd(T*V);
 
 Xtrue = X;
-Ttrue = T;
-Vtrue = V;
-
 % Missing values are denoted by nans. Let's make some of the elements of X
 % unobserved.
-X(rand(size(X))>0.05) = NaN; % remove 90% of entries
+X(rand(size(X))>0.1) = NaN; % remove 90% of entries
+% Removing items which have no rating *and* no parents
+toremove = all(isnan(X)) & noparents_bool;
+X(:,toremove) = [];
+Xtrue(:,toremove) = [];
+V(:,toremove) = []';
+adjacency(toremove,:) = [];
+adjacency(:,toremove) = [];
+numparents = sum(adjacency);
+noparents_bool = numparents==0;
+nr_params_to_initialize = sum(noparents_bool);
+noparents = find(noparents_bool);
+% I should probably do the same with users which have no ratings, but'it's
+% a small probability we'll have that
+
+
+Ttrue = T;
+Vtrue = V;
+figure(2); imagesc(V./repmat(max(V,[],2),1,size(V,2)))
+figure(3); imagesc(Xtrue)
