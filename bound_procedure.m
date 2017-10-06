@@ -29,19 +29,21 @@ for(current = 1:last_v)
             - 1./scale.*expectations_markov(current,:,1) - gammaln(shape)...
             - shape.*log(scale) );
     else if(numparents == 1)
-        a_ve_of_parents = a_ve(parent_indices,:);
+        shapes =  repmat(a_ve(current,:),[numparents,1]);
+        scales = 1./(shapes.*expectations_markov(parent_indices,:,1));
         part1 = part1 + sum( sum( ( ...
-            (a_ve_of_parents - 1).*repmat(expectations_markov(current,:,2), numparents,1) - ...
-            a_ve_of_parents.*expectations_markov(parent_indices,:,1).*repmat(expectations_markov(current,:,1), numparents,1 ) - ...
-            repmat( gammaln( a_ve(current,:) ), numparents,1) + ...
-            a_ve_of_parents .* log( a_ve_of_parents.*expectations_markov(parent_indices,:,1) )) ));
+            (shapes - 1).*repmat(expectations_markov(current,:,2), numparents,1) - ...
+            1./scales.*repmat(expectations_markov(current,:,1), numparents,1 ) - ...
+            gammaln( shapes ) - ...
+            shapes .* log( scales ) ) ));
         else
-            a_ve_of_parents = a_ve(parent_indices,:);
+            shapes =  repmat(a_ve(current,:),[numparents,1]);
+            scales = 1./(shapes.*expectations_markov(parent_indices,:,1));
             part1 = part1 + sum( sum( expectations_discrete{current}(:,:) .* ( ...
-                (a_ve_of_parents - 1).*repmat(expectations_markov(current,:,2), numparents,1) - ...
-                a_ve_of_parents.*expectations_markov(parent_indices,:,1).*repmat(expectations_markov(current,:,1), numparents,1 ) - ...
-                repmat( gammaln( a_ve(current,:) ), numparents,1) + ...
-                a_ve_of_parents .* log( a_ve_of_parents.*expectations_markov(parent_indices,:,1) )) ));
+               (shapes - 1).*repmat(expectations_markov(current,:,2), numparents,1) - ...
+                1./scales.*repmat(expectations_markov(current,:,1), numparents,1 ) - ...
+                gammaln( shapes ) - ...
+                shapes .* log( scales )   ) ));
         end
     end
     
@@ -78,28 +80,27 @@ for(current = first_s:network_size)
     parent = find( gamma_chain_adjacency(:,current) );
     %numparents = size(parent_indices,1);    % will always be equal to one
     shape = a_ve(current,:);
-    scale = 1./(a_ve(parent,:).*expectations_markov(parent,:,1));
-    %a_ve(parent)==a_ve_current;
+    scale = 1./(shape.*expectations_markov(parent,:,1));
     part1 = part1 + sum( ...
         (shape-1).*expectations_markov(current,:,2) ...
         - 1./scale.*expectations_markov(current,:,1) - gammaln(shape)...
         - shape.*log(scale) );
     
-    % contribution to bound - the entropy part
-    get_messages_utility;
+%     % contribution to bound - the entropy part
+%     get_messages_utility;
+%     
+%     natural_parameters = sum(messages);
+%     a = natural_parameters(:,:,2)+1;
+%     b = -1./natural_parameters(:,:,1);
     
-    natural_parameters = sum(messages);
-    a = natural_parameters(:,:,2)+1;
-    b = -1./natural_parameters(:,:,1);
-    
-    psi_a_ = psi(a);
-    part2 = part2 + sum(-(a-1).*psi_a_+log(b)+ a + gammaln(a));
+%     psi_a_ = psi(a);
+%     part2 = part2 + sum(-(a-1).*psi_a_+log(b) + a + gammaln(a));
     % sum the bound part components across Bayes networks and
     % add them to bound
 end
 
 bound = bound + part1 + part2;
-
+bound = bound+entropies;
 %
 % Mixture selection part of Bayes net - discrete distros together with
 % Dirichlet priors
@@ -153,6 +154,6 @@ for(current = relevant_indices)
     bound = bound + sum(bound_part,2);
     if(isnan(bound))
         % Just a precaution, but should not happen
-        error('Broken dirichscrete')
+        warning('Broken dirichscrete')
     end
 end
