@@ -2,7 +2,7 @@
 %
 
 % Width and height of the input matrix, which is to be decomposed 
-W = 75;
+W = 20;
 K = 100;
 % 'I' is the number of factors
 I = 5;
@@ -45,7 +45,7 @@ b_tm = ones(W,I); % rightfactor will be mean of exponential distros
 % proceed to sampling
 V = zeros(I,K);
 V(:,noparents) = gamrnd(a_ve(:,noparents), b_ve(:,noparents));
-%
+% %
 % now topological ordering comes in handy - because when we sample from a
 % distribution of a node, we have to be sure that we sampled from all its
 % ancestors and with a topologically ordered adjacency matrix we can

@@ -3,10 +3,7 @@ function [E_t E_v a_tm b_tm a_ve b_ve M] = structuredNMF_VB(x, a_tm, b_tm, a_ve,
 
 % note that b_tm and b_ve are not scales - those are means...
 generate_initial_data
-% b_tm = b_tm./a_tm;
-% b_ve = b_ve./a_ve;
-% load('graphlab_test_matlab.mat');
-% EPOCH = 10
+save('graphlab_test_matlab.mat');   % save input data, to be passed to prepare_for_graphlab
 
 relevant_indeces = uint32(relevant_indeces);
 LtLv_raw = zeros(size(x_raw));
@@ -19,9 +16,7 @@ gammalnX_raw = gammaln(double(x_raw) + 1);
 start_from = 1;
 bounds = [];
 for e=start_from:EPOCH,
-    e
-    tic;
-    
+    tic
     calculate_bound = rem(e, print_period)==0 | e==EPOCH;
     
     %LtLv = L_t*L_v; % this can potentially be a large matrix - but we only
@@ -96,6 +91,8 @@ for e=start_from:EPOCH,
     end
        
     expectations_markov(1:last_v,:,2) = temp_log_markov; % delaying the assignment due to bound calculation
+    L_t = exp(psi(alpha_tm)).*beta_tm;
+    L_v = exp(expectations_markov(1:last_v,:,2)');
     
     % Updating the mixture selection models, alongside with their Dirichlet
     % priors. Mixture models is added to gamma nodes which have multiple
@@ -114,6 +111,7 @@ for e=start_from:EPOCH,
         % ...and the expectation of such a Dirichlet is
         expectations_dirichlet{current} = psi(u_parameters) - ...
             ones(size(u_parameters))*diag( psi(sum(u_parameters,1)) );
+        %
         % Discrete distributions:
         get_messages_discrete;
         natural_parameters = sum(messages,3);
@@ -132,107 +130,103 @@ for e=start_from:EPOCH,
         % expectations_discrete{current} = exp(natural_parameters)./repmat(Z,size(natural_parameters,1),1);
     end
     
-    L_t = exp(psi(alpha_tm)).*beta_tm;
-    L_v = exp(expectations_markov(1:last_v,:,2)');
-    
-    if(e>start_optimizing_hyperparameters_after)
-        %% Hyperparameter optimization
-        %.
-        switch tie_b_tm,
-            case 'free',
-                b_tm = E_t;
-            case 'rows',
-                b_tm = repmat(sum(a_tm.*E_t, 1)./sum(a_tm,1), [W 1]);
-            case 'cols',
-                b_tm = repmat(sum(a_tm.*E_t, 2)./sum(a_tm,2), [1 I]);
-            case 'tie_all',
-                b_tm = sum(sum(a_tm.*E_t))./sum(a_tm(:)).*ones(W, I);
-            % case 'clamp', do nothing
-        end;
-        
-        % Newton-Rapshon numerical optimization for shape parameters
-        if ~strcmp( tie_a_tm, 'clamp'),
-            Z = E_t./b_tm - (log(L_t) - log(b_tm));
-            switch tie_a_tm,
-                case 'free',
-                    a_tm = gnmf_solvebynewton(Z, a_tm);
-                case 'rows',
-                    a_tm = gnmf_solvebynewton(sum(Z,1)/W, a_tm);
-                case 'cols',
-                    a_tm = gnmf_solvebynewton(sum(Z,2)/I, a_tm);
-                case 'tie_all',
-                    a_tm = gnmf_solvebynewton(sum(Z(:))/(W*I), a_tm);
-                % case 'clamp', do nothing
-            end;
-        end;
-        
-        % Updating the shapes and scales related to factor V
-        % For a_ve, b_ve optimization has to be done by traversing the DAGs.
-        % This code makes 2 options available:
-        %   1. clamped a_ve, clamped b_ve -> 'clamp'
-        %   2. rowwise tied a_ve (as dictated by parameter_mappings_V), free b_ve -> 'free'
-        %   3. clamped a_ve, free b_ve -> 'free'
-        switch(tie_v)
-            case 'free',
-                % TODO: more extensive testing - are 10 iterations of
-                % Newton-Raphson enough?
-                nonzero_bs = (b_ve(:,1) ~= 0)';   % supposing graphical models have the same structure for each row of V
-                for( iter = 1:size(parameter_mappings_V,1) )
-                    currentDAG = parameter_mappings_V(iter,:);
-                    mask = currentDAG & ~nonzero_bs;
-                    
-                    indeces = find(mask);
-                    Z=0;
-                    for(i = indeces)
-                        parent_indices = find( gamma_chain_adjacency(:,i) );
-                        if( isempty(expectations_discrete{i}) )
-                            Z = Z + ...
-                                expectations_markov(i,:,1).*sum(expectations_markov(parent_indices,:,1) ,1) ...
-                                -expectations_markov(i,:,2) ...
-                                -sum(expectations_markov(parent_indices,:,2) ,1);
-                        else
-                            Z = Z + ...
-                                expectations_markov(i,:,1).*sum(expectations_markov(parent_indices,:,1).*expectations_discrete{i}(:,:) ,1) ...
-                                -expectations_markov(i,:,2) ...
-                                -sum(expectations_markov(parent_indices,:,2).*expectations_discrete{i}(:,:) ,1);
-                        end
-                    end
-                    % accumulating from non-topmost nodes done
-                    mask = currentDAG & nonzero_bs;
-                    indeces = find(mask);               
-                    % b_ve (topmost only)
-                    b_ve(indeces,:) = expectations_markov(indeces,:,1);
-                    % topmost done.
-                    Z = Z + sum( expectations_markov(indeces,:,1)./b_ve(indeces,:) ...
-                        -expectations_markov(indeces,:,2) + ...
-                        log(b_ve(indeces,:)), 1);
-                    
-                    Z = Z/sum(parameter_mappings_V(iter,:),2); % to get the form prepared for solving
-                    indeces = find(currentDAG);
-                    a_ve(indeces,:) = gnmf_solvebynewton(Z, a_ve(indeces,:));
-                end
-            case 'semifree',
-                nonzero_bs = (b_ve(:,1) ~= 0)';   % supposing graphical models have the same structure for each row of V
-                for( iter = 1:size(parameter_mappings_V,1) )
-                    currentDAG = parameter_mappings_V(iter,:);
-                                                            
-                    mask = currentDAG & nonzero_bs;     % TODO: don't calculate this at each iteration - store it
-                    indeces = find(mask);      
-                    % b_ve (topmost only)
-                    b_ve(indeces,:) = expectations_markov(indeces,:,1);
-                    
-                end
-                % free parameters end
-            case 'clamp'
-                % do nothing                
-        end
-        
-    end
-    
+%     if(e>start_optimizing_hyperparameters_after)
+%         %% Hyperparameter optimization
+%         %.
+%         switch tie_b_tm,
+%             case 'free',
+%                 b_tm = E_t;
+%             case 'rows',
+%                 b_tm = repmat(sum(a_tm.*E_t, 1)./sum(a_tm,1), [W 1]);
+%             case 'cols',
+%                 b_tm = repmat(sum(a_tm.*E_t, 2)./sum(a_tm,2), [1 I]);
+%             case 'tie_all',
+%                 b_tm = sum(sum(a_tm.*E_t))./sum(a_tm(:)).*ones(W, I);
+%             % case 'clamp', do nothing
+%         end;
+%         
+%         % Newton-Rapshon numerical optimization for shape parameters
+%         if ~strcmp( tie_a_tm, 'clamp'),
+%             Z = E_t./b_tm - (log(L_t) - log(b_tm));
+%             switch tie_a_tm,
+%                 case 'free',
+%                     a_tm = gnmf_solvebynewton(Z, a_tm);
+%                 case 'rows',
+%                     a_tm = gnmf_solvebynewton(sum(Z,1)/W, a_tm);
+%                 case 'cols',
+%                     a_tm = gnmf_solvebynewton(sum(Z,2)/I, a_tm);
+%                 case 'tie_all',
+%                     a_tm = gnmf_solvebynewton(sum(Z(:))/(W*I), a_tm);
+%                 % case 'clamp', do nothing
+%             end;
+%         end;
+%         
+%         % Updating the shapes and scales related to factor V
+%         % For a_ve, b_ve optimization has to be done by traversing the DAGs.
+%         % This code makes 2 options available:
+%         %   1. clamped a_ve, clamped b_ve -> 'clamp'
+%         %   2. rowwise tied a_ve (as dictated by parameter_mappings_V), free b_ve -> 'free'
+%         %   3. clamped a_ve, free b_ve -> 'free'
+%         switch(tie_v)
+%             case 'free',
+%                 % TODO: more extensive testing - are 10 iterations of
+%                 % Newton-Raphson enough?
+%                 nonzero_bs = (b_ve(:,1) ~= 0)';   % supposing graphical models have the same structure for each row of V
+%                 for( iter = 1:size(parameter_mappings_V,1) )
+%                     currentDAG = parameter_mappings_V(iter,:);
+%                     mask = currentDAG & ~nonzero_bs;
+%                     
+%                     indeces = find(mask);
+%                     Z=0;
+%                     for(i = indeces)
+%                         parent_indices = find( gamma_chain_adjacency(:,i) );
+%                         if( isempty(expectations_discrete{i}) )
+%                             Z = Z + ...
+%                                 expectations_markov(i,:,1).*sum(expectations_markov(parent_indices,:,1) ,1) ...
+%                                 -expectations_markov(i,:,2) ...
+%                                 -sum(expectations_markov(parent_indices,:,2) ,1);
+%                         else
+%                             Z = Z + ...
+%                                 expectations_markov(i,:,1).*sum(expectations_markov(parent_indices,:,1).*expectations_discrete{i}(:,:) ,1) ...
+%                                 -expectations_markov(i,:,2) ...
+%                                 -sum(expectations_markov(parent_indices,:,2).*expectations_discrete{i}(:,:) ,1);
+%                         end
+%                     end
+%                     % accumulating from non-topmost nodes done
+%                     mask = currentDAG & nonzero_bs;
+%                     indeces = find(mask);               
+%                     % b_ve (topmost only)
+%                     b_ve(indeces,:) = expectations_markov(indeces,:,1);
+%                     % topmost done.
+%                     Z = Z + sum( expectations_markov(indeces,:,1)./b_ve(indeces,:) ...
+%                         -expectations_markov(indeces,:,2) + ...
+%                         log(b_ve(indeces,:)), 1);
+%                     
+%                     Z = Z/sum(parameter_mappings_V(iter,:),2); % to get the form prepared for solving
+%                     indeces = find(currentDAG);
+%                     a_ve(indeces,:) = gnmf_solvebynewton(Z, a_ve(indeces,:));
+%                 end
+%             case 'semifree',
+%                 nonzero_bs = (b_ve(:,1) ~= 0)';   % supposing graphical models have the same structure for each row of V
+%                 for( iter = 1:size(parameter_mappings_V,1) )
+%                     currentDAG = parameter_mappings_V(iter,:);
+%                                                             
+%                     mask = currentDAG & nonzero_bs;     % TODO: don't calculate this at each iteration - store it
+%                     indeces = find(mask);      
+%                     % b_ve (topmost only)
+%                     b_ve(indeces,:) = expectations_markov(indeces,:,1);
+%                     
+%                 end
+%                 % free parameters end
+%             case 'clamp'
+%                 % do nothing                
+%         end
+%         
+%     end
+%     
     tictocs(1,e) = toc;
     
 end
-
 
 Sig_t
 Sig_v
